@@ -5,6 +5,8 @@ Typesafe iteration over tuples and more
 Helpers:
 1. [ksxnodemodules/typescript-tuple](https://github.com/ksxnodemodules/typescript-tuple)
 2. [totalolage/typescript-tuple](https://github.com/totalolage/typescript-tuple)
+3. [graffhyrum/entries.md](https://gist.github.com/graffhyrum/1253b24fbe80d5f508544736d83d9532)
+4. https://github.com/microsoft/TypeScript/pull/24897#issuecomment-419406826
 
 
 Problem to be solved:
