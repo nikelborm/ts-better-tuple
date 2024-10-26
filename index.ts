@@ -27,6 +27,20 @@ type BundleBack<
 
 export type Prettify<T> = { [P in keyof T]: T[P] } & {};
 
+// TODO: respond to https://github.com/Microsoft/TypeScript/issues/26223#issuecomment-410847836 when I finish this
+
+// TODO: implement "pop" | "push" | "concat" | "join" | "reverse" | "shift"
+// | "slice" | "sort" | "splice" | "unshift" | "indexOf" | "lastIndexOf" |
+// "every" | "some" | "forEach" | "filter" | "reduce" | "reduceRight" |
+// "find" | "findIndex" | "fill" | "copyWithin" | "entries" | "keys" |
+// "values" | "includes" | "flatMap" | "flat" | "at" | "findLast" |
+// "findLastIndex" | "toReversed" | "toSorted" | "toSpliced" | "with"
+
+
+// The list above inspired by type of asds
+// `declare const asds: Prettify<Exclude<keyof [], 'map'>>;`
+
+
 class BetterTuple<
   const Tuple extends unknown[],
   // Enumeration extends Enumerate<Tuple> = Enumerate<Tuple>
@@ -55,6 +69,10 @@ class BetterTuple<
 
   unwrap() {
     return this.source
+  }
+
+  get length() {
+    return this.source.length as Tuple['length']
   }
 }
 
@@ -85,21 +103,21 @@ const tuple = new BetterTuple(fruits);
 
 
 const asd = tuple
-  .map(<T extends [number, unknown], U>(t: T, arr: U) => [
-    t[0],
-    typeof t[1] === 'object'
-      && t[1] !== null
-      && 'name' in t[1]
-      && typeof t[1]['name'] === 'string'
-      && 'color' in t[1]
-      && typeof t[1]['color'] === 'string'
-    ? `${capitalize(t[1]['name'])} has ${t[1]['color']} color`
-    : `fucked up object at index ${t[0]}`
+  .map(<T extends [number, unknown], U>([index, value]: T, arr: U) => [
+    index,
+    typeof value === 'object'
+      && value !== null
+      && 'name' in value
+      && typeof value['name'] === 'string'
+      && 'color' in value
+      && typeof value['color'] === 'string'
+    ? `${capitalize(value['name'])} has ${value['color']} color`
+    : `broken object at index ${index}`
   ] as (
     // hint to distribute the type is needed here, so this `extends` has 2
     // roles at the same time. It runs the check AND distributes the type
     T extends [number, { name: string, color: string }]
       ? [T[0], `${Capitalize<T[1]['name']>} has ${T[1]['color']} color`]
-      : [T[0], `fucked up object at index ${T[0]}`]
+      : [T[0], `broken object at index ${T[0]}`]
   ))
   .unwrap();
