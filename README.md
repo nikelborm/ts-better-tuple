@@ -7,6 +7,7 @@ Helpers:
 2. [totalolage/typescript-tuple](https://github.com/totalolage/typescript-tuple)
 3. [graffhyrum/entries.md](https://gist.github.com/graffhyrum/1253b24fbe80d5f508544736d83d9532)
 4. https://github.com/microsoft/TypeScript/pull/24897#issuecomment-419406826
+5. https://github.com/gvergnaud/hotscript
 
 
 Problem to be solved:
