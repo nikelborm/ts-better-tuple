@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "build": "tsc",
-    "test": "tsx watch --clear-screen ./test.ts"
+    "test": "tsx watch --clear-screen ./index.ts"
   },
   "keywords": [],
   "author": "",

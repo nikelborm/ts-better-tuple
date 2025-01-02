@@ -49,8 +49,10 @@ class BetterTuple<
 
   map<U extends [number, unknown]>(
     callbackfn: (
-      valueWithIndex: Enumerate<Tuple> extends infer T extends unknown[]
-        ? T[number]
+      valueWithIndex: Tuple extends any
+        ? Enumerate<Tuple> extends infer T extends unknown[]
+          ? T[number]
+          : never
         : never,
       array: Tuple
     ) => U
