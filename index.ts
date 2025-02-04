@@ -2,26 +2,30 @@ import { capitalize } from 'tsafe';
 
 type Enumerate<
   SourceTuple extends unknown[],
-  ResultEntriesTuple extends [number, unknown][] = []
-> =
-  ResultEntriesTuple['length'] extends SourceTuple['length']
-    ? ResultEntriesTuple
-    : Enumerate<SourceTuple, [
-      ...ResultEntriesTuple,
-      [ResultEntriesTuple['length'], SourceTuple[ResultEntriesTuple['length']]]
-    ]>;
+  ResultEntriesTuple extends [unknown, number][] = [],
+> = ResultEntriesTuple['length'] extends SourceTuple['length']
+  ? ResultEntriesTuple
+  : Enumerate<
+      SourceTuple,
+      [
+        ...ResultEntriesTuple,
+        [
+          SourceTuple[ResultEntriesTuple['length']],
+          ResultEntriesTuple['length'],
+        ],
+      ]
+    >;
 
 type BundleBack<
-  UnionOfEntries extends [number, unknown],
-  ResultTuple extends unknown[] = []
-> =
-  [UnionOfEntries] extends [never]
-    ? ResultTuple
-    : BundleBack<
-      Exclude<UnionOfEntries, [ResultTuple['length'], unknown]>,
+  UnionOfEntries extends [unknown, number],
+  ResultTuple extends unknown[] = [],
+> = [UnionOfEntries] extends [never]
+  ? ResultTuple
+  : BundleBack<
+      Exclude<UnionOfEntries, [unknown, ResultTuple['length']]>,
       [
         ...ResultTuple,
-        Extract<UnionOfEntries, [ResultTuple['length'], unknown]>[1]
+        Extract<UnionOfEntries, [unknown, ResultTuple['length']]>[0],
       ]
     >;
 
@@ -36,10 +40,8 @@ export type Prettify<T> = { [P in keyof T]: T[P] } & {};
 // "values" | "includes" | "flatMap" | "flat" | "at" | "findLast" |
 // "findLastIndex" | "toReversed" | "toSorted" | "toSpliced" | "with"
 
-
 // The list above inspired by type of asds
 // `declare const asds: Prettify<Exclude<keyof [], 'map'>>;`
-
 
 class BetterTuple<
   const Tuple extends unknown[],
@@ -47,79 +49,82 @@ class BetterTuple<
 > {
   constructor(private readonly source: Tuple) {}
 
-  map<U extends [number, unknown]>(
+  map<U extends [unknown, number]>(
     callbackfn: (
       valueWithIndex: Tuple extends any
         ? Enumerate<Tuple> extends infer T extends unknown[]
           ? T[number]
           : never
         : never,
-      array: Tuple
-    ) => U
+      array: Tuple,
+    ) => U,
   ) {
-    const returns = []
+    const returns = [];
     for (let index = 0; index < this.source.length; index++) {
-      returns.push(
-        callbackfn(
-          [index, this.source[index]] as any,
-          this.source
-        )
-      );
+      returns.push(callbackfn([this.source[index], index] as any, this.source));
     }
     return new BetterTuple(returns as BundleBack<U>);
   }
 
   unwrap() {
-    return this.source
+    return this.source;
   }
 
   get length() {
-    return this.source.length as Tuple['length']
+    return this.source.length as Tuple['length'];
   }
 }
 
 const fruits = [
   {
-    name: "apple",
-    color: "red"
+    name: 'apple',
+    color: 'red',
   },
   {
-    name: "pear",
-    color: "yellow"
+    name: 'pear',
+    color: 'yellow',
   },
   {
-    name: "weirvyujkwervjn",
-    colorFF: "q8974234by73wo8uhie"
+    name: 'weirvyujkwervjn',
+    colorFF: 'q8974234by73wo8uhie',
   },
   {
-    name: "watermelon",
-    color: "green"
+    name: 'watermelon',
+    color: 'green',
   },
   {
-    nameDDDD: "3298vbyw4v3eouh",
-    color: "asibdu8q3ovihaueuwi"
+    nameDDDD: '3298vbyw4v3eouh',
+    color: 'asibdu8q3ovihaueuwi',
   },
-] as const satisfies unknown[]
+] as const satisfies unknown[];
 
 const tuple = new BetterTuple(fruits);
 
-
 const asd = tuple
-  .map(<T extends [number, unknown], U>([index, value]: T, arr: U) => [
-    index,
-    typeof value === 'object'
-      && value !== null
-      && 'name' in value
-      && typeof value['name'] === 'string'
-      && 'color' in value
-      && typeof value['color'] === 'string'
-    ? `${capitalize(value['name'])} has ${value['color']} color`
-    : `broken object at index ${index}`
-  ] as (
-    // hint to distribute the type is needed here, so this `extends` has 2
-    // roles at the same time. It runs the check AND distributes the type
-    T extends [number, { name: string, color: string }]
-      ? [T[0], `${Capitalize<T[1]['name']>} has ${T[1]['color']} color`]
-      : [T[0], `broken object at index ${T[0]}`]
-  ))
+  .map(
+    <T extends [unknown, number], U>([value, index]: T, arr: U) =>
+      [
+        typeof value === 'object' &&
+        value !== null &&
+        'name' in value &&
+        typeof value['name'] === 'string' &&
+        'color' in value &&
+        typeof value['color'] === 'string'
+          ? `${capitalize(value['name'])} has ${value['color']} color`
+          : `broken object at index ${index}`,
+        index,
+        // hint to distribute the type is needed here, so this `extends` has 2
+        // roles at the same time. It runs the check AND distributes the type
+      ] as T extends [{ name: string; color: string }, number]
+        ? [`${Capitalize<T[0]['name']>} has ${T[0]['color']} color`, T[1]]
+        : [`broken object at index ${T[1]}`, T[1]],
+  )
   .unwrap();
+// Correctly inferred type (and value) should be
+// const asd: [
+//   "Apple has red color",
+//   "Pear has yellow color",
+//   "broken object at index 2",
+//   "Watermelon has green color",
+//   "broken object at index 4"
+// ]
