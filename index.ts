@@ -1,11 +1,11 @@
 import { capitalize } from 'tsafe';
 
-type Enumerate<
+type TupleOfEntriesWithIndexesMappedToValues<
   SourceTuple extends unknown[],
   ResultEntriesTuple extends [unknown, number][] = [],
 > = ResultEntriesTuple['length'] extends SourceTuple['length']
   ? ResultEntriesTuple
-  : Enumerate<
+  : TupleOfEntriesWithIndexesMappedToValues<
       SourceTuple,
       [
         ...ResultEntriesTuple,
@@ -16,22 +16,54 @@ type Enumerate<
       ]
     >;
 
+type GetUnionOfTuplesHavingValuesAndTheirIndexes<
+  SourceTuple extends unknown[],
+> = (SourceTuple extends any
+  ? TupleOfEntriesWithIndexesMappedToValues<SourceTuple> extends infer T extends unknown[]
+    ? T[number]
+    : never
+  : never) &
+  [unknown, number];
+
 type BundleBack<
   UnionOfEntries extends [unknown, number],
   ResultTuple extends unknown[] = [],
+  ExtendableTupleJustForIteration extends unknown[] = [],
 > = [UnionOfEntries] extends [never]
   ? ResultTuple
   : BundleBack<
-      Exclude<UnionOfEntries, [unknown, ResultTuple['length']]>,
-      [
-        ...ResultTuple,
-        Extract<UnionOfEntries, [unknown, ResultTuple['length']]>[0],
-      ]
+      Exclude<
+        UnionOfEntries,
+        [unknown, ExtendableTupleJustForIteration['length']]
+      >,
+      Extract<
+        UnionOfEntries,
+        [unknown, ExtendableTupleJustForIteration['length']]
+      > extends infer U extends [unknown, number]
+        ? [U] extends [never]
+          ? ResultTuple
+          : [...ResultTuple, U[0]]
+        : never,
+      [...ExtendableTupleJustForIteration, 1]
     >;
+
+type sadadsds = BundleBack<['asd', 0] | ['sdf', 1]>;
+//   ^ ["asd", "sdf"]
+
+type sadadsds2 = BundleBack<
+  ['0', 0] | ['2', 2] | ['4', 6] | ['6', 4] | ['5', 4]
+>;
+//   ^ ["0", "2", "6" | "5", "4"]
 
 export type Prettify<T> = { [P in keyof T]: T[P] } & {};
 
 // TODO: respond to https://github.com/Microsoft/TypeScript/issues/26223#issuecomment-410847836 when I finish this
+
+// TODO: add validation of indexes
+// 1. map should return all the indexes present in source array: no more, no less
+// 2. filter should not return indexes that were not present in source array
+// 3. there should not be duplicated indexes
+// etc...
 
 // TODO: implement "pop" | "push" | "concat" | "join" | "reverse" | "shift"
 // | "slice" | "sort" | "splice" | "unshift" | "indexOf" | "lastIndexOf" |
@@ -44,24 +76,35 @@ export type Prettify<T> = { [P in keyof T]: T[P] } & {};
 // `declare const asds: Prettify<Exclude<keyof [], 'map'>>;`
 
 class BetterTuple<
-  const Tuple extends unknown[],
+  const SourceTuple extends unknown[],
+  UnionOfTuplesHavingValuesAndTheirIndexes extends GetUnionOfTuplesHavingValuesAndTheirIndexes<SourceTuple> = GetUnionOfTuplesHavingValuesAndTheirIndexes<SourceTuple>,
   // Enumeration extends Enumerate<Tuple> = Enumerate<Tuple>
 > {
-  constructor(private readonly source: Tuple) {}
+  constructor(private readonly source: SourceTuple) {}
 
-  map<U extends [unknown, number]>(
+  map<U>(
     callbackfn: (
-      valueWithIndex: Tuple extends any
-        ? Enumerate<Tuple> extends infer T extends unknown[]
-          ? T[number]
-          : never
-        : never,
-      array: Tuple,
+      valueWithIndex: UnionOfTuplesHavingValuesAndTheirIndexes,
+      array: SourceTuple,
     ) => U,
   ) {
     const returns = [];
     for (let index = 0; index < this.source.length; index++) {
       returns.push(callbackfn([this.source[index], index] as any, this.source));
+    }
+    return new BetterTuple(returns as BundleBack<U & [unknown, number]>);
+  }
+
+  filter<U extends UnionOfTuplesHavingValuesAndTheirIndexes>(
+    predicate: (
+      valueWithIndex: UnionOfTuplesHavingValuesAndTheirIndexes,
+      array: SourceTuple,
+    ) => valueWithIndex is U,
+  ) {
+    const returns = [];
+    for (let index = 0; index < this.source.length; index++) {
+      if (predicate([this.source[index], index] as any, this.source))
+        returns.push(this.source[index]);
     }
     return new BetterTuple(returns as BundleBack<U>);
   }
@@ -71,7 +114,7 @@ class BetterTuple<
   }
 
   get length() {
-    return this.source.length as Tuple['length'];
+    return this.source.length as SourceTuple['length'];
   }
 }
 
@@ -98,11 +141,9 @@ const fruits = [
   },
 ] as const satisfies unknown[];
 
-const tuple = new BetterTuple(fruits);
-
-const asd = tuple
+const asd1 = new BetterTuple(fruits)
   .map(
-    <T extends [unknown, number], U>([value, index]: T, arr: U) =>
+    <T extends [unknown, number]>([value, index]: T) =>
       [
         typeof value === 'object' &&
         value !== null &&
@@ -121,10 +162,107 @@ const asd = tuple
   )
   .unwrap();
 // Correctly inferred type (and value) should be
-// const asd: [
+// const asd1: [
 //   "Apple has red color",
 //   "Pear has yellow color",
 //   "broken object at index 2",
 //   "Watermelon has green color",
 //   "broken object at index 4"
+// ]
+
+const asd2 = new BetterTuple(asd1)
+  .filter(
+    (
+      tuple,
+    ): tuple is Exclude<
+      typeof tuple,
+      [`broken object at index ${string}`, number]
+    > => !tuple[0].startsWith('broken object at index '),
+  )
+  .unwrap();
+// Correctly inferred type (and value) should be
+// const asd2: [
+//   "Apple has red color",
+//   "Pear has yellow color",
+//   "Watermelon has green color",
+// ]
+
+const asd3 = new BetterTuple(fruits)
+  .map(
+    <T extends [unknown, number], U>([value, index]: T) =>
+      [
+        typeof value === 'object' &&
+        value !== null &&
+        'name' in value &&
+        typeof value['name'] === 'string' &&
+        'color' in value &&
+        typeof value['color'] === 'string'
+          ? `${capitalize(value['name'])} has ${value['color']} color`
+          : `broken object at index ${index}`,
+        index,
+        // hint to distribute the type is needed here, so this `extends` has 2
+        // roles at the same time. It runs the check AND distributes the type
+      ] as T extends [{ name: string; color: string }, number]
+        ? [`${Capitalize<T[0]['name']>} has ${T[0]['color']} color`, T[1]]
+        : [`broken object at index ${T[1]}`, T[1]],
+  )
+  .filter(
+    (
+      v_i,
+    ): v_i is Exclude<
+      typeof v_i,
+      [`broken object at index ${string}`, number]
+    > => !v_i[0].startsWith('broken object at index '),
+  )
+  .unwrap();
+
+// Correctly inferred type (and value) should be
+// const asd3: [
+//   "Apple has red color",
+//   "Pear has yellow color",
+//   "Watermelon has green color",
+// ]
+
+// `extends ...` is a hint to distribute the type
+type StringViewOfFruit<V_I> = V_I extends [
+  { name: string; color: string },
+  number,
+]
+  ? [`${Capitalize<V_I[0]['name']>} has ${V_I[0]['color']} color`, V_I[1]]
+  : never;
+
+const asd4 = new BetterTuple(fruits)
+  .filter(
+    (
+      v_i,
+    ): v_i is Extract<
+      typeof v_i,
+      [{ name: string; color: string }, number]
+    > => {
+      const [value] = v_i;
+      return (
+        typeof value === 'object' &&
+        value !== null &&
+        'name' in value &&
+        typeof value['name'] === 'string' &&
+        'color' in value &&
+        typeof value['color'] === 'string'
+      );
+    },
+  )
+  .map(
+    v_i =>
+      [
+        `${capitalize(v_i[0]['name'])} has ${v_i[0]['color']} color`,
+        v_i[1],
+        // hint to distribute the type is required here
+      ] as StringViewOfFruit<typeof v_i>,
+  )
+  .unwrap();
+
+// Correctly inferred type (and value) should be
+// const asd4: [
+//   "Apple has red color",
+//   "Pear has yellow color",
+//   "Watermelon has green color",
 // ]
