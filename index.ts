@@ -28,7 +28,7 @@ type GetUnionOfTuplesHavingValuesAndTheirIndexes<
 type BundleBack<
   UnionOfEntries extends [unknown, number],
   ResultTuple extends unknown[] = [],
-  ExtendableTupleJustForIteration extends unknown[] = [],
+  ExtendableTupleJustForIteration extends 1[] = [],
 > = [UnionOfEntries] extends [never]
   ? ResultTuple
   : BundleBack<
@@ -47,6 +47,34 @@ type BundleBack<
       [...ExtendableTupleJustForIteration, 1]
     >;
 
+type CastableToString = string | number | bigint | boolean | null | undefined;
+
+type Join<
+  UnionOfEntries extends [CastableToString, number],
+  Separator extends string,
+  ResultString extends string = '',
+  ExtendableTupleJustForIteration extends 1[] = [],
+> = [UnionOfEntries] extends [never]
+  ? ResultString
+  : Join<
+      Exclude<
+        UnionOfEntries,
+        [CastableToString, ExtendableTupleJustForIteration['length']]
+      >,
+      Separator,
+      Extract<
+        UnionOfEntries,
+        [CastableToString, ExtendableTupleJustForIteration['length']]
+      > extends infer U extends [CastableToString, number]
+        ? [U] extends [never]
+          ? ResultString
+          : U extends [unknown, 0]
+          ? `${U[0]}`
+          : `${ResultString}${Separator}${U[0]}`
+        : never,
+      [...ExtendableTupleJustForIteration, 1]
+    >;
+
 type sadadsds = BundleBack<['asd', 0] | ['sdf', 1]>;
 //   ^ ["asd", "sdf"]
 
@@ -54,6 +82,12 @@ type sadadsds2 = BundleBack<
   ['0', 0] | ['2', 2] | ['4', 6] | ['6', 4] | ['5', 4]
 >;
 //   ^ ["0", "2", "6" | "5", "4"]
+
+type sadadsds3 = Join<
+  ['0', 0] | ['2', 2] | ['4', 6] | ['6', 4] | ['5', 4],
+  ', '
+>;
+//   ^  "0, 2, 5, 4" | "0, 2, 6, 4"
 
 export type Prettify<T> = { [P in keyof T]: T[P] } & {};
 
@@ -109,6 +143,14 @@ class BetterTuple<
     return new BetterTuple(returns as BundleBack<U>);
   }
 
+  join<const Separator extends string>(separator?: Separator) {
+    return this.source.join(separator) as [
+      UnionOfTuplesHavingValuesAndTheirIndexes,
+    ] extends [[CastableToString, number]]
+      ? Join<UnionOfTuplesHavingValuesAndTheirIndexes, Separator>
+      : string;
+  }
+
   unwrap() {
     return this.source;
   }
@@ -117,6 +159,20 @@ class BetterTuple<
     return this.source.length as SourceTuple['length'];
   }
 }
+
+const preserveOnlyNormalFruits = <const T extends [unknown, number]>(
+  v_i: T,
+): v_i is Extract<T, [{ name: string; color: string }, number]> => {
+  const [value] = v_i;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'name' in value &&
+    typeof value['name'] === 'string' &&
+    'color' in value &&
+    typeof value['color'] === 'string'
+  );
+};
 
 const fruits = [
   {
@@ -143,17 +199,12 @@ const fruits = [
 
 const asd1 = new BetterTuple(fruits)
   .map(
-    <T extends [unknown, number]>([value, index]: T) =>
+    <T extends [unknown, number], U>(t: T) =>
       [
-        typeof value === 'object' &&
-        value !== null &&
-        'name' in value &&
-        typeof value['name'] === 'string' &&
-        'color' in value &&
-        typeof value['color'] === 'string'
-          ? `${capitalize(value['name'])} has ${value['color']} color`
-          : `broken object at index ${index}`,
-        index,
+        preserveOnlyNormalFruits(t)
+          ? `${capitalize(t[0]['name'])} has ${t[0]['color']} color`
+          : `broken object at index ${t[1]}`,
+        t[1],
         // hint to distribute the type is needed here, so this `extends` has 2
         // roles at the same time. It runs the check AND distributes the type
       ] as T extends [{ name: string; color: string }, number]
@@ -189,17 +240,12 @@ const asd2 = new BetterTuple(asd1)
 
 const asd3 = new BetterTuple(fruits)
   .map(
-    <T extends [unknown, number], U>([value, index]: T) =>
+    <T extends [unknown, number], U>(t: T) =>
       [
-        typeof value === 'object' &&
-        value !== null &&
-        'name' in value &&
-        typeof value['name'] === 'string' &&
-        'color' in value &&
-        typeof value['color'] === 'string'
-          ? `${capitalize(value['name'])} has ${value['color']} color`
-          : `broken object at index ${index}`,
-        index,
+        preserveOnlyNormalFruits(t)
+          ? `${capitalize(t[0]['name'])} has ${t[0]['color']} color`
+          : `broken object at index ${t[1]}`,
+        t[1],
         // hint to distribute the type is needed here, so this `extends` has 2
         // roles at the same time. It runs the check AND distributes the type
       ] as T extends [{ name: string; color: string }, number]
@@ -232,24 +278,7 @@ type StringViewOfFruit<V_I> = V_I extends [
   : never;
 
 const asd4 = new BetterTuple(fruits)
-  .filter(
-    (
-      v_i,
-    ): v_i is Extract<
-      typeof v_i,
-      [{ name: string; color: string }, number]
-    > => {
-      const [value] = v_i;
-      return (
-        typeof value === 'object' &&
-        value !== null &&
-        'name' in value &&
-        typeof value['name'] === 'string' &&
-        'color' in value &&
-        typeof value['color'] === 'string'
-      );
-    },
-  )
+  .filter(preserveOnlyNormalFruits)
   .map(
     v_i =>
       [
@@ -266,3 +295,23 @@ const asd4 = new BetterTuple(fruits)
 //   "Pear has yellow color",
 //   "Watermelon has green color",
 // ]
+
+const asd5 = new BetterTuple(fruits)
+  .filter(preserveOnlyNormalFruits)
+  .map(
+    <T extends [{ name: string; color: string }, number]>(v_i: T) =>
+      // hint to distribute the type is required here
+      [v_i[0]['name'], v_i[1]] as T extends any ? [T[0]['name'], T[1]] : never,
+  )
+  .join(', ');
+
+// Correctly inferred type (and value) should be
+// const asd5: "apple, pear, watermelon"
+
+const asd6 = new BetterTuple(fruits)
+  .filter(preserveOnlyNormalFruits)
+  .join(', ');
+
+// Generally inferred type (and value) should be
+// const asd6: string
+// Because it can't cast objects to string in type-system
